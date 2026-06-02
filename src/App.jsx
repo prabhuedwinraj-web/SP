@@ -237,57 +237,174 @@ function BroadValue() {
 }
 
 /* ─── FEATURE 1 — VISIBILITY ──────────────────────────────── */
+const BAR_DEFS = [
+  { nm: 'Video',      base: 74, color: '#0055ff', color2: '#06c8c8', icon: '▶' },
+  { nm: 'Web / TLS',  base: 58, color: '#1b8af0', color2: '#06c8c8', icon: '🔒' },
+  { nm: 'VoIP / RTP', base: 41, color: '#6e56f7', color2: '#a78bfa', icon: '🎙' },
+  { nm: 'Gaming',     base: 33, color: '#0055ff', color2: '#38bdf8', icon: '🎮' },
+  { nm: 'Messaging',  base: 27, color: '#06c8c8', color2: '#2bd17e', icon: '💬' },
+  { nm: 'P2P / VPN',  base: 18, color: '#6e56f7', color2: '#0055ff', icon: '🔗' },
+]
+
 function VisibilityBars() {
   const vizRef = useRef(null)
-  const bars = [
-    { nm: 'Video', w: 74, grad: 'linear-gradient(90deg,#0055ff,#06c8c8)' },
-    { nm: 'Web / TLS', w: 58, grad: 'linear-gradient(90deg,#1b8af0,#06c8c8)' },
-    { nm: 'VoIP / RTP', w: 41, grad: 'linear-gradient(90deg,#6e56f7,#06c8c8)' },
-    { nm: 'Gaming', w: 33, grad: 'linear-gradient(90deg,#0055ff,#1b8af0)' },
-    { nm: 'Messaging', w: 27, grad: 'linear-gradient(90deg,#06c8c8,#2bd17e)' },
-    { nm: 'P2P / VPN', w: 18, grad: 'linear-gradient(90deg,#6e56f7,#0055ff)' },
-  ]
-  const [widths, setWidths] = useState(bars.map(() => 0))
-  const [pcts, setPcts] = useState(bars.map(b => b.w))
+  const [widths, setWidths] = useState(BAR_DEFS.map(() => 0))
+  const [pcts, setPcts]     = useState(BAR_DEFS.map(b => b.base))
+  const [active, setActive] = useState(null)
   const animated = useRef(false)
+
   useEffect(() => {
     const el = vizRef.current
     if (!el) return
     const obs = new IntersectionObserver((es) => {
-      if (es[0].isIntersecting && !animated.current) {
-        animated.current = true
-        setWidths(bars.map(b => b.w))
-        obs.disconnect()
-        const t = setInterval(() => {
-          setPcts(prev => prev.map((v, i) => {
-            const base = bars[i].w
-            const next = Math.max(8, Math.min(96, base + (Math.random() - 0.5) * 8))
-            return Math.round(next)
-          }))
-          setWidths(prev => prev.map((v, i) => {
-            const base = bars[i].w
-            return Math.max(8, Math.min(96, base + (Math.random() - 0.5) * 8))
-          }))
-        }, 1800)
-        return () => clearInterval(t)
-      }
-    }, { threshold: 0.4 })
+      if (!es[0].isIntersecting || animated.current) return
+      animated.current = true
+      obs.disconnect()
+
+      // stagger bars in one by one
+      BAR_DEFS.forEach((b, i) => {
+        setTimeout(() => {
+          setWidths(prev => { const n=[...prev]; n[i]=b.base; return n })
+        }, i * 120)
+      })
+
+      // live wiggle
+      const t = setInterval(() => {
+        const idx = Math.floor(Math.random() * BAR_DEFS.length)
+        setActive(idx)
+        setTimeout(() => setActive(null), 600)
+
+        setWidths(prev => prev.map((v, i) => {
+          const base = BAR_DEFS[i].base
+          return Math.max(8, Math.min(96, base + (Math.random() - 0.5) * 10))
+        }))
+        setPcts(prev => prev.map((v, i) => {
+          const base = BAR_DEFS[i].base
+          return Math.round(Math.max(8, Math.min(96, base + (Math.random() - 0.5) * 10)))
+        }))
+      }, 1600)
+      return () => clearInterval(t)
+    }, { threshold: 0.3 })
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
+
   return (
-    <div className="viz" ref={vizRef}>
-      <div className="viz-grid"></div>
-      <div className="viz-head"><span className="vd" style={{ background: '#ff5f57' }}></span><span className="vd" style={{ background: '#febc2e' }}></span><span className="vd" style={{ background: '#28c840' }}></span>&nbsp;&nbsp;layer7_classifier.live</div>
-      <div className="l7">
-        {bars.map((b, i) => (
-          <div className="l7-bar" key={b.nm}>
-            <span className="nm">{b.nm}</span>
-            <span className="l7-track"><span className="l7-fill" style={{ width: widths[i] + '%', background: b.grad }}></span></span>
-            <span className="pct">{pcts[i]}%</span>
-          </div>
-        ))}
+    <div ref={vizRef} style={{
+      position: 'relative', borderRadius: 20, overflow: 'hidden',
+      background: 'linear-gradient(160deg,#0c1730,#0a1020)',
+      border: '1px solid rgba(255,255,255,.08)',
+      boxShadow: '0 40px 80px -44px rgba(12,23,48,.6)',
+    }}>
+      {/* grid */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: 'linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px)',
+        backgroundSize: '34px 34px',
+      }} />
+
+      {/* scanning sweep line */}
+      <div style={{
+        position: 'absolute', top: 0, bottom: 0, width: 2,
+        background: 'linear-gradient(var(--cyan),transparent)',
+        opacity: .18,
+        animation: 'sweep 3s ease-in-out infinite',
+      }} />
+
+      {/* title bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '14px 18px', fontFamily: "'JetBrains Mono',monospace",
+        fontSize: 11, color: 'var(--on-dark-2)', position: 'relative', zIndex: 2,
+        borderBottom: '1px solid rgba(255,255,255,.05)',
+      }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f57', display: 'inline-block' }} />
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#febc2e', display: 'inline-block' }} />
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#28c840', display: 'inline-block' }} />
+        &nbsp;&nbsp;layer7_classifier.live
+        <span style={{
+          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
+          color: 'var(--cyan)', fontSize: 10,
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--cyan)', animation: 'blink 1.4s infinite', display: 'inline-block' }} />
+          LIVE
+        </span>
       </div>
+
+      {/* bars */}
+      <div style={{ padding: '20px 22px 24px', position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {BAR_DEFS.map((b, i) => {
+          const isActive = active === i
+          const grad = `linear-gradient(90deg, ${b.color}, ${b.color2})`
+          return (
+            <div key={b.nm} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {/* label */}
+              <span style={{
+                width: 96, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5,
+                color: isActive ? '#fff' : 'var(--on-dark)',
+                transition: 'color .3s',
+                flexShrink: 0,
+              }}>{b.nm}</span>
+
+              {/* track */}
+              <div style={{
+                flex: 1, height: 10, background: 'rgba(255,255,255,.06)',
+                borderRadius: 6, overflow: 'visible', position: 'relative',
+              }}>
+                {/* filled bar */}
+                <div style={{
+                  height: '100%', borderRadius: 6,
+                  background: grad,
+                  width: widths[i] + '%',
+                  transition: 'width 1s cubic-bezier(.22,.61,.36,1)',
+                  position: 'relative',
+                  boxShadow: isActive ? `0 0 12px ${b.color2}` : 'none',
+                }}>
+                  {/* leading glow dot */}
+                  <div style={{
+                    position: 'absolute', right: -4, top: '50%', transform: 'translateY(-50%)',
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: b.color2,
+                    boxShadow: `0 0 ${isActive ? 12 : 6}px ${b.color2}`,
+                    transition: 'box-shadow .3s',
+                    opacity: widths[i] > 0 ? 1 : 0,
+                  }} />
+                </div>
+              </div>
+
+              {/* pct */}
+              <span style={{
+                width: 38, textAlign: 'right',
+                fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5,
+                color: isActive ? b.color2 : 'var(--on-dark-2)',
+                fontWeight: isActive ? 700 : 400,
+                transition: 'color .3s',
+              }}>{pcts[i]}%</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* bottom total bar */}
+      <div style={{
+        borderTop: '1px solid rgba(255,255,255,.05)',
+        padding: '12px 22px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5,
+        color: 'var(--on-dark-3)', position: 'relative', zIndex: 2,
+      }}>
+        <span>6,000+ protocols identified</span>
+        <span style={{ color: 'var(--cyan)' }}>↑ 2.3% vs last hour</span>
+      </div>
+
+      <style>{`
+        @keyframes sweep {
+          0%   { left: -2px; opacity: 0; }
+          10%  { opacity: .18; }
+          90%  { opacity: .18; }
+          100% { left: 100%; opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 }
