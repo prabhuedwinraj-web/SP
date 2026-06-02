@@ -432,6 +432,151 @@ function FeatureVisibility() {
   )
 }
 
+/* ─── ANIMATED GLOBE ──────────────────────────────────────── */
+function AnimatedGlobe() {
+  const canvasRef = useRef(null)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width = 340
+    const H = canvas.height = 280
+    const cx = W / 2, cy = H / 2
+    const R = 108  // globe radius
+
+    // Arc threat paths: {p1, ctrl, p2, color, speed, t}
+    const arcs = [
+      { p1: { x: cx - 80, y: cy - 28 }, ctrl: { x: cx, y: cy - 72 }, p2: { x: cx + 72, y: cy - 18 }, color: '#ff5c7a', t: 0, speed: 0.004 },
+      { p1: { x: cx - 56, y: cy + 48 }, ctrl: { x: cx + 14, y: cy + 74 }, p2: { x: cx + 58, y: cy + 12 }, color: '#6e56f7', t: 0.33, speed: 0.003 },
+      { p1: { x: cx - 28, y: cy - 54 }, ctrl: { x: cx - 44, y: cy + 14 }, p2: { x: cx + 26, y: cy + 54 }, color: '#06c8c8', t: 0.66, speed: 0.0035 },
+    ]
+
+    let globeAngle = 0
+    let raf
+
+    function quadPoint(p1, ctrl, p2, t) {
+      return {
+        x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*ctrl.x + t*t*p2.x,
+        y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*ctrl.y + t*t*p2.y,
+      }
+    }
+
+    function drawGlobe() {
+      // outer circle
+      ctx.beginPath()
+      ctx.arc(cx, cy, R, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(6,200,200,.22)'
+      ctx.lineWidth = 1.2
+      ctx.stroke()
+
+      // latitude lines (3)
+      ;[-0.5, 0, 0.5].forEach(latFrac => {
+        const ry = R * Math.abs(Math.cos(latFrac * Math.PI))
+        const offsetY = cy + R * Math.sin(latFrac * Math.PI) * 0.5
+        ctx.beginPath()
+        ctx.ellipse(cx, offsetY, ry, ry * 0.28, 0, 0, Math.PI * 2)
+        ctx.strokeStyle = latFrac === 0 ? 'rgba(6,200,200,.3)' : 'rgba(6,200,200,.14)'
+        ctx.setLineDash(latFrac === 0 ? [] : [4, 6])
+        ctx.lineWidth = latFrac === 0 ? 1.2 : 0.8
+        ctx.stroke()
+        ctx.setLineDash([])
+      })
+
+      // rotating longitude ellipse
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate(globeAngle)
+      ctx.beginPath()
+      ctx.ellipse(0, 0, R * 0.38, R, 0, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(6,200,200,.18)'
+      ctx.lineWidth = 0.9
+      ctx.stroke()
+      // second longitude 90deg offset
+      ctx.rotate(Math.PI / 2)
+      ctx.beginPath()
+      ctx.ellipse(0, 0, R * 0.38, R, 0, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(6,200,200,.1)'
+      ctx.lineWidth = 0.7
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    function drawArcs() {
+      arcs.forEach(arc => {
+        arc.t = (arc.t + arc.speed) % 1
+
+        // draw full path (faint)
+        ctx.beginPath()
+        ctx.moveTo(arc.p1.x, arc.p1.y)
+        ctx.quadraticCurveTo(arc.ctrl.x, arc.ctrl.y, arc.p2.x, arc.p2.y)
+        ctx.strokeStyle = arc.color + '55'
+        ctx.lineWidth = 1.6
+        ctx.setLineDash([])
+        ctx.stroke()
+
+        // draw travelled portion (bright)
+        const steps = 40
+        ctx.beginPath()
+        for (let s = 0; s <= steps; s++) {
+          const st = (arc.t * s) / steps
+          const pt = quadPoint(arc.p1, arc.ctrl, arc.p2, st)
+          s === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)
+        }
+        ctx.strokeStyle = arc.color
+        ctx.lineWidth = 2
+        ctx.stroke()
+
+        // endpoint dots (static)
+        ;[arc.p1, arc.p2].forEach((pt, i) => {
+          const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.003 + i * Math.PI)
+          ctx.beginPath()
+          ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2)
+          ctx.fillStyle = arc.color
+          ctx.shadowColor = arc.color
+          ctx.shadowBlur = 10 * pulse
+          ctx.fill()
+          ctx.shadowBlur = 0
+        })
+
+        // traveling dot
+        const tpt = quadPoint(arc.p1, arc.ctrl, arc.p2, arc.t)
+        ctx.beginPath()
+        ctx.arc(tpt.x, tpt.y, 5.5, 0, Math.PI * 2)
+        ctx.fillStyle = '#fff'
+        ctx.shadowColor = arc.color
+        ctx.shadowBlur = 16
+        ctx.fill()
+        ctx.shadowBlur = 0
+      })
+    }
+
+    function drawCenter() {
+      // pulsing center dot
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.004)
+      ctx.beginPath()
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2)
+      ctx.fillStyle = '#0070fd'
+      ctx.shadowColor = '#0070fd'
+      ctx.shadowBlur = 20 + 10 * pulse
+      ctx.fill()
+      ctx.shadowBlur = 0
+    }
+
+    function frame() {
+      ctx.clearRect(0, 0, W, H)
+      globeAngle += 0.006
+      drawGlobe()
+      drawArcs()
+      drawCenter()
+      raf = requestAnimationFrame(frame)
+    }
+    frame()
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  return <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+}
+
 /* ─── FEATURE 2 — SECURITY ────────────────────────────────── */
 function ThreatFeed() {
   const samples = [
@@ -440,9 +585,9 @@ function ThreatFeed() {
     ['#ffb547', 'Suspicious ASN', 'KP'], ['#ff5c7a', 'Ransomware C2', 'VN']
   ]
   const [items, setItems] = useState([
-    { color: '#ff5c7a', label: 'C2 beacon', country: 'RU', key: 0 },
-    { color: '#ffb547', label: 'Phishing URL', country: 'CN', key: 1 },
-    { color: '#ff5c7a', label: 'Botnet node', country: 'IR', key: 2 },
+    { color: '#ff5c7a', label: 'C2 beacon', country: 'RU · 45.x.x.x', key: 0 },
+    { color: '#ffb547', label: 'Phishing URL', country: 'CN · 118.x.x.x', key: 1 },
+    { color: '#ff5c7a', label: 'Botnet node', country: 'IR · 184.x.x.x', key: 2 },
   ])
   useEffect(() => {
     let idx = 0
@@ -458,33 +603,42 @@ function ThreatFeed() {
     }, 1400)
     return () => clearInterval(t)
   }, [])
+
   return (
-    <div className="viz">
+    <div className="viz" style={{ aspectRatio: '4 / 3.6' }}>
       <div className="viz-grid"></div>
-      <div className="viz-head"><span className="vd" style={{ background: '#ff5f57' }}></span><span className="vd" style={{ background: '#febc2e' }}></span><span className="vd" style={{ background: '#28c840' }}></span>&nbsp;&nbsp;threat_intel.geo</div>
-      <div className="geo">
-        <svg viewBox="0 0 200 200" fill="none">
-          <circle className="ring" cx="100" cy="100" r="78"/>
-          <circle className="ring" cx="100" cy="100" r="54" strokeDasharray="3 5"/>
-          <ellipse className="ring" cx="100" cy="100" rx="78" ry="30"/>
-          <ellipse className="ring" cx="100" cy="100" rx="40" ry="78"/>
-          <path className="arc" d="M40 70 Q100 30 160 80" stroke="#ff5c7a" strokeWidth="1.6"/>
-          <path className="arc" d="M52 140 Q110 170 150 110" stroke="#6e56f7" strokeWidth="1.6"/>
-          <path className="arc" d="M70 50 Q60 110 120 150" stroke="#06c8c8" strokeWidth="1.6"/>
-          <circle cx="40" cy="70" r="3.5" fill="#ff5c7a"/><circle cx="160" cy="80" r="3.5" fill="#ff5c7a"/>
-          <circle cx="52" cy="140" r="3" fill="#6e56f7"/><circle cx="150" cy="110" r="3" fill="#6e56f7"/>
-          <circle cx="70" cy="50" r="3" fill="#06c8c8"/><circle cx="120" cy="150" r="3" fill="#06c8c8"/>
-          <circle cx="100" cy="100" r="5" fill="#0070fd"/>
-        </svg>
+      <div className="viz-head">
+        <span className="vd" style={{ background: '#ff5f57' }}></span>
+        <span className="vd" style={{ background: '#febc2e' }}></span>
+        <span className="vd" style={{ background: '#28c840' }}></span>
+        &nbsp;&nbsp;threat_intel.geo
       </div>
-      <div className="threat-list">
-        {items.map((it, i) => (
-          <div className="threat-item" key={it.key} style={{ opacity: 1, transform: 'none' }}>
-            <span className="sev" style={{ background: it.color, boxShadow: `0 0 8px ${it.color}` }}></span>
-            <span className="tt">{it.label}</span>
-            <small>{it.country}</small>
-          </div>
-        ))}
+      {/* globe fills the left ~60% */}
+      <div style={{ position: 'absolute', inset: 0, top: 40, display: 'flex', alignItems: 'center' }}>
+        <div style={{ flex: '0 0 62%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <AnimatedGlobe />
+        </div>
+        {/* threat feed right side */}
+        <div style={{ flex: 1, paddingRight: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map((it) => (
+            <div key={it.key} style={{
+              background: 'rgba(11,18,36,.86)', border: '1px solid var(--line-d)',
+              borderRadius: 12, padding: '10px 12px',
+              fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
+              color: 'var(--on-dark)',
+              transition: 'opacity .4s, transform .4s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: it.color, boxShadow: `0 0 8px ${it.color}`,
+                }} />
+                <span style={{ fontWeight: 600, color: '#fff', fontSize: 11.5 }}>{it.label}</span>
+              </div>
+              <div style={{ color: 'var(--on-dark-3)', fontSize: 10.5, paddingLeft: 16 }}>{it.country}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
