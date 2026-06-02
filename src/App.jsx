@@ -435,146 +435,188 @@ function FeatureVisibility() {
 /* ─── ANIMATED GLOBE ──────────────────────────────────────── */
 function AnimatedGlobe() {
   const canvasRef = useRef(null)
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const SIZE = 300
+    canvas.width  = SIZE * dpr
+    canvas.height = SIZE * dpr
+    canvas.style.width  = SIZE + 'px'
+    canvas.style.height = SIZE + 'px'
     const ctx = canvas.getContext('2d')
-    const W = canvas.width = 340
-    const H = canvas.height = 280
-    const cx = W / 2, cy = H / 2
-    const R = 108  // globe radius
+    ctx.scale(dpr, dpr)
 
-    // Arc threat paths: {p1, ctrl, p2, color, speed, t}
-    const arcs = [
-      { p1: { x: cx - 80, y: cy - 28 }, ctrl: { x: cx, y: cy - 72 }, p2: { x: cx + 72, y: cy - 18 }, color: '#ff5c7a', t: 0, speed: 0.004 },
-      { p1: { x: cx - 56, y: cy + 48 }, ctrl: { x: cx + 14, y: cy + 74 }, p2: { x: cx + 58, y: cy + 12 }, color: '#6e56f7', t: 0.33, speed: 0.003 },
-      { p1: { x: cx - 28, y: cy - 54 }, ctrl: { x: cx - 44, y: cy + 14 }, p2: { x: cx + 26, y: cy + 54 }, color: '#06c8c8', t: 0.66, speed: 0.0035 },
-    ]
+    const cx = SIZE / 2, cy = SIZE / 2, R = 118
+    let spin = 0, raf
 
-    let globeAngle = 0
-    let raf
-
-    function quadPoint(p1, ctrl, p2, t) {
-      return {
-        x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*ctrl.x + t*t*p2.x,
-        y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*ctrl.y + t*t*p2.y,
-      }
+    // Project a lat/lon (radians) onto canvas, accounting for globe spin
+    function project(lat, lon) {
+      const l = lon + spin
+      const x = cx + R * Math.cos(lat) * Math.sin(l)
+      const y = cy - R * Math.sin(lat)
+      const z = Math.cos(lat) * Math.cos(l)   // depth: >0 = front
+      return { x, y, z }
     }
 
-    function drawGlobe() {
-      // outer circle
+    // Draw a latitude circle
+    function drawLatitude(lat, dashed) {
+      const steps = 120
+      let started = false
       ctx.beginPath()
-      ctx.arc(cx, cy, R, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(6,200,200,.22)'
-      ctx.lineWidth = 1.2
+      ctx.setLineDash(dashed ? [3, 5] : [])
+      for (let i = 0; i <= steps; i++) {
+        const lon = (i / steps) * Math.PI * 2
+        const p = project(lat, lon)
+        if (p.z < -0.02) { started = false; continue }
+        started ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), started = true)
+      }
+      ctx.strokeStyle = lat === 0 ? 'rgba(6,200,200,.35)' : 'rgba(6,200,200,.15)'
+      ctx.lineWidth = lat === 0 ? 1.3 : 0.8
       ctx.stroke()
+      ctx.setLineDash([])
+    }
 
-      // latitude lines (3)
-      ;[-0.5, 0, 0.5].forEach(latFrac => {
-        const ry = R * Math.abs(Math.cos(latFrac * Math.PI))
-        const offsetY = cy + R * Math.sin(latFrac * Math.PI) * 0.5
-        ctx.beginPath()
-        ctx.ellipse(cx, offsetY, ry, ry * 0.28, 0, 0, Math.PI * 2)
-        ctx.strokeStyle = latFrac === 0 ? 'rgba(6,200,200,.3)' : 'rgba(6,200,200,.14)'
-        ctx.setLineDash(latFrac === 0 ? [] : [4, 6])
-        ctx.lineWidth = latFrac === 0 ? 1.2 : 0.8
-        ctx.stroke()
-        ctx.setLineDash([])
-      })
-
-      // rotating longitude ellipse
-      ctx.save()
-      ctx.translate(cx, cy)
-      ctx.rotate(globeAngle)
+    // Draw a longitude arc (meridian)
+    function drawMeridian(lon) {
+      const steps = 100
+      let started = false
       ctx.beginPath()
-      ctx.ellipse(0, 0, R * 0.38, R, 0, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(6,200,200,.18)'
-      ctx.lineWidth = 0.9
-      ctx.stroke()
-      // second longitude 90deg offset
-      ctx.rotate(Math.PI / 2)
-      ctx.beginPath()
-      ctx.ellipse(0, 0, R * 0.38, R, 0, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(6,200,200,.1)'
+      ctx.setLineDash([3, 5])
+      for (let i = 0; i <= steps; i++) {
+        const lat = -Math.PI / 2 + (i / steps) * Math.PI
+        const p = project(lat, lon)
+        if (p.z < -0.02) { started = false; continue }
+        started ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), started = true)
+      }
+      ctx.strokeStyle = 'rgba(6,200,200,.14)'
       ctx.lineWidth = 0.7
       ctx.stroke()
-      ctx.restore()
+      ctx.setLineDash([])
     }
 
-    function drawArcs() {
-      arcs.forEach(arc => {
-        arc.t = (arc.t + arc.speed) % 1
+    // Threat arc: lat/lon start & end, lifted above surface
+    const threatArcs = [
+      { lat1:  0.6, lon1: -1.8, lat2:  0.5, lon2:  0.4, color: '#ff5c7a', t: 0.0, spd: 0.006 },
+      { lat1: -0.4, lon1: -0.6, lat2: -0.3, lon2:  1.2, color: '#6e56f7', t: 0.4, spd: 0.005 },
+      { lat1:  0.8, lon1:  0.2, lat2: -0.5, lon2:  0.9, color: '#06c8c8', t: 0.7, spd: 0.0045 },
+    ]
 
-        // draw full path (faint)
-        ctx.beginPath()
-        ctx.moveTo(arc.p1.x, arc.p1.y)
-        ctx.quadraticCurveTo(arc.ctrl.x, arc.ctrl.y, arc.p2.x, arc.p2.y)
-        ctx.strokeStyle = arc.color + '55'
-        ctx.lineWidth = 1.6
-        ctx.setLineDash([])
-        ctx.stroke()
-
-        // draw travelled portion (bright)
-        const steps = 40
-        ctx.beginPath()
-        for (let s = 0; s <= steps; s++) {
-          const st = (arc.t * s) / steps
-          const pt = quadPoint(arc.p1, arc.ctrl, arc.p2, st)
-          s === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)
-        }
-        ctx.strokeStyle = arc.color
-        ctx.lineWidth = 2
-        ctx.stroke()
-
-        // endpoint dots (static)
-        ;[arc.p1, arc.p2].forEach((pt, i) => {
-          const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.003 + i * Math.PI)
-          ctx.beginPath()
-          ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2)
-          ctx.fillStyle = arc.color
-          ctx.shadowColor = arc.color
-          ctx.shadowBlur = 10 * pulse
-          ctx.fill()
-          ctx.shadowBlur = 0
-        })
-
-        // traveling dot
-        const tpt = quadPoint(arc.p1, arc.ctrl, arc.p2, arc.t)
-        ctx.beginPath()
-        ctx.arc(tpt.x, tpt.y, 5.5, 0, Math.PI * 2)
-        ctx.fillStyle = '#fff'
-        ctx.shadowColor = arc.color
-        ctx.shadowBlur = 16
-        ctx.fill()
-        ctx.shadowBlur = 0
-      })
+    function lerpLatLon(a, b, t) {
+      // Slerp-ish: interpolate lat/lon + lift arc above surface
+      const lat = a.lat + (b.lat - a.lat) * t
+      const lon = a.lon + (b.lon - a.lon) * t
+      // lift factor: arc peaks at t=0.5
+      const lift = 1 + 0.22 * Math.sin(t * Math.PI)
+      return { lat, lon, lift }
     }
 
-    function drawCenter() {
-      // pulsing center dot
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.004)
+    function drawThreatArc(arc) {
+      const steps = 60
+      const a = { lat: arc.lat1, lon: arc.lon1 }
+      const b = { lat: arc.lat2, lon: arc.lon2 }
+
+      // faint full path
       ctx.beginPath()
-      ctx.arc(cx, cy, 7, 0, Math.PI * 2)
-      ctx.fillStyle = '#0070fd'
-      ctx.shadowColor = '#0070fd'
-      ctx.shadowBlur = 20 + 10 * pulse
-      ctx.fill()
+      let started = false
+      for (let i = 0; i <= steps; i++) {
+        const { lat, lon, lift } = lerpLatLon(a, b, i / steps)
+        const l = lon + spin
+        const px = cx + R * lift * Math.cos(lat) * Math.sin(l)
+        const py = cy - R * lift * Math.sin(lat)
+        const z  = Math.cos(lat) * Math.cos(l)
+        if (z < 0) { started = false; continue }
+        started ? ctx.lineTo(px, py) : (ctx.moveTo(px, py), started = true)
+      }
+      ctx.strokeStyle = arc.color + '40'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      // bright travelled portion
+      ctx.beginPath()
+      started = false
+      for (let i = 0; i <= steps; i++) {
+        const frac = i / steps
+        if (frac > arc.t) break
+        const { lat, lon, lift } = lerpLatLon(a, b, frac)
+        const l = lon + spin
+        const px = cx + R * lift * Math.cos(lat) * Math.sin(l)
+        const py = cy - R * lift * Math.sin(lat)
+        const z  = Math.cos(lat) * Math.cos(l)
+        if (z < 0) { started = false; continue }
+        started ? ctx.lineTo(px, py) : (ctx.moveTo(px, py), started = true)
+      }
+      ctx.strokeStyle = arc.color
+      ctx.lineWidth = 2
+      ctx.shadowColor = arc.color
+      ctx.shadowBlur = 6
+      ctx.stroke()
       ctx.shadowBlur = 0
+
+      // endpoint origin dot
+      const p1 = project(arc.lat1, arc.lon1)
+      if (p1.z > 0) {
+        const pulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.003)
+        ctx.beginPath(); ctx.arc(p1.x, p1.y, 4, 0, Math.PI*2)
+        ctx.fillStyle = arc.color
+        ctx.shadowColor = arc.color; ctx.shadowBlur = 10 * pulse
+        ctx.fill(); ctx.shadowBlur = 0
+      }
+
+      // traveling dot
+      const { lat: tl, lon: tlon, lift: tlift } = lerpLatLon(a, b, arc.t)
+      const tl2 = tlon + spin
+      const tx = cx + R * tlift * Math.cos(tl) * Math.sin(tl2)
+      const ty = cy - R * tlift * Math.sin(tl)
+      const tz = Math.cos(tl) * Math.cos(tl2)
+      if (tz > 0) {
+        ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI*2)
+        ctx.fillStyle = '#fff'
+        ctx.shadowColor = arc.color; ctx.shadowBlur = 18
+        ctx.fill(); ctx.shadowBlur = 0
+      }
+
+      arc.t = (arc.t + arc.spd) % 1
     }
 
     function frame() {
-      ctx.clearRect(0, 0, W, H)
-      globeAngle += 0.006
-      drawGlobe()
-      drawArcs()
-      drawCenter()
+      ctx.clearRect(0, 0, SIZE, SIZE)
+      spin += 0.004
+
+      // outer sphere circle
+      ctx.beginPath()
+      ctx.arc(cx, cy, R, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(6,200,200,.3)'
+      ctx.lineWidth = 1.4
+      ctx.setLineDash([])
+      ctx.stroke()
+
+      // latitude lines
+      ;[-0.52, -0.26, 0, 0.26, 0.52].forEach((lat, i) => drawLatitude(lat, i !== 2))
+
+      // meridians (4 evenly spaced)
+      ;[0, Math.PI/4, Math.PI/2, 3*Math.PI/4].forEach(lon => drawMeridian(lon))
+
+      // threat arcs
+      threatArcs.forEach(drawThreatArc)
+
+      // center glow dot
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003)
+      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2)
+      ctx.fillStyle = '#0070fd'
+      ctx.shadowColor = '#0070fd'; ctx.shadowBlur = 20 + 12 * pulse
+      ctx.fill(); ctx.shadowBlur = 0
+
       raf = requestAnimationFrame(frame)
     }
     frame()
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  return <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+  return (
+    <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
+  )
 }
 
 /* ─── FEATURE 2 — SECURITY ────────────────────────────────── */
