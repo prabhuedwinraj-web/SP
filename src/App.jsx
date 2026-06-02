@@ -440,186 +440,179 @@ function AnimatedGlobe() {
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const SIZE = 300
-    canvas.width  = SIZE * dpr
-    canvas.height = SIZE * dpr
-    canvas.style.width  = SIZE + 'px'
-    canvas.style.height = SIZE + 'px'
+    const S = 380
+    canvas.width = S * dpr; canvas.height = S * dpr
+    canvas.style.width = S + 'px'; canvas.style.height = S + 'px'
     const ctx = canvas.getContext('2d')
     ctx.scale(dpr, dpr)
 
-    const cx = SIZE / 2, cy = SIZE / 2, R = 118
+    const cx = S / 2, cy = S / 2, R = 155
     let spin = 0, raf
 
-    // Project a lat/lon (radians) onto canvas, accounting for globe spin
-    function project(lat, lon) {
+    const proj = (lat, lon) => {
       const l = lon + spin
-      const x = cx + R * Math.cos(lat) * Math.sin(l)
-      const y = cy - R * Math.sin(lat)
-      const z = Math.cos(lat) * Math.cos(l)   // depth: >0 = front
-      return { x, y, z }
+      return {
+        x: cx + R * Math.cos(lat) * Math.sin(l),
+        y: cy - R * Math.sin(lat),
+        z:      Math.cos(lat) * Math.cos(l),
+      }
     }
 
-    // Draw a latitude circle
-    function drawLatitude(lat, dashed) {
-      const steps = 120
-      let started = false
-      ctx.beginPath()
-      ctx.setLineDash(dashed ? [3, 5] : [])
-      for (let i = 0; i <= steps; i++) {
-        const lon = (i / steps) * Math.PI * 2
-        const p = project(lat, lon)
-        if (p.z < -0.02) { started = false; continue }
-        started ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), started = true)
-      }
-      ctx.strokeStyle = lat === 0 ? 'rgba(6,200,200,.35)' : 'rgba(6,200,200,.15)'
-      ctx.lineWidth = lat === 0 ? 1.3 : 0.8
-      ctx.stroke()
-      ctx.setLineDash([])
+    const COLORS = ['#06c8c8','#0070fd','#ff5c7a','#6e56f7','#ffb547','#2bd17e','#38bdf8','#f472b6']
+    // Evenly spread around globe so ~half always visible
+    const nodes = Array.from({ length: 30 }, (_, i) => ({
+      lat: (Math.random() - 0.5) * Math.PI * 0.85,
+      lon: (i / 30) * Math.PI * 2,
+      color: COLORS[i % COLORS.length],
+      r: 2.5 + Math.random() * 3,
+      phase: (i / 30) * Math.PI * 2,
+      spd: 0.016 + Math.random() * 0.022,
+    }))
+
+    const arcPairs = Array.from({length:6},(_,i)=>({
+      a: nodes[i*4 % nodes.length],
+      b: nodes[(i*4+9) % nodes.length],
+      color: COLORS[i % COLORS.length],
+      t: i/6, spd: 0.004+Math.random()*0.003,
+    }))
+
+    const qbez = (p1,c,p2,t) => {
+      const u=1-t
+      return {x:u*u*p1.x+2*u*t*c.x+t*t*p2.x, y:u*u*p1.y+2*u*t*c.y+t*t*p2.y}
     }
 
-    // Draw a longitude arc (meridian)
-    function drawMeridian(lon) {
-      const steps = 100
-      let started = false
-      ctx.beginPath()
-      ctx.setLineDash([3, 5])
-      for (let i = 0; i <= steps; i++) {
-        const lat = -Math.PI / 2 + (i / steps) * Math.PI
-        const p = project(lat, lon)
-        if (p.z < -0.02) { started = false; continue }
-        started ? ctx.lineTo(p.x, p.y) : (ctx.moveTo(p.x, p.y), started = true)
-      }
-      ctx.strokeStyle = 'rgba(6,200,200,.14)'
-      ctx.lineWidth = 0.7
-      ctx.stroke()
-      ctx.setLineDash([])
+    function drawSphere() {
+      // Clip all drawing to sphere
+      ctx.save()
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip()
+
+      // Dark blue fill with light source top-left
+      const fill = ctx.createRadialGradient(cx-R*.4, cy-R*.4, R*.05, cx, cy, R*1.2)
+      fill.addColorStop(0,   'rgba(18,50,110,.9)')
+      fill.addColorStop(0.45,'rgba(8,20,55,.95)')
+      fill.addColorStop(1,   'rgba(2,6,18,1)')
+      ctx.fillStyle = fill
+      ctx.fillRect(0,0,S,S)
+      ctx.restore()
+
+      // Atmosphere rim
+      const atm = ctx.createRadialGradient(cx,cy,R*.78,cx,cy,R*1.12)
+      atm.addColorStop(0,'transparent')
+      atm.addColorStop(0.5,'rgba(0,100,255,.12)')
+      atm.addColorStop(1,'rgba(6,200,200,.28)')
+      ctx.beginPath(); ctx.arc(cx,cy,R*1.12,0,Math.PI*2)
+      ctx.fillStyle=atm; ctx.fill()
+
+      // Outer ring
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2)
+      ctx.strokeStyle='rgba(6,200,200,.5)'; ctx.lineWidth=1.5; ctx.stroke()
     }
 
-    // Threat arc: lat/lon start & end, lifted above surface
-    const threatArcs = [
-      { lat1:  0.6, lon1: -1.8, lat2:  0.5, lon2:  0.4, color: '#ff5c7a', t: 0.0, spd: 0.006 },
-      { lat1: -0.4, lon1: -0.6, lat2: -0.3, lon2:  1.2, color: '#6e56f7', t: 0.4, spd: 0.005 },
-      { lat1:  0.8, lon1:  0.2, lat2: -0.5, lon2:  0.9, color: '#06c8c8', t: 0.7, spd: 0.0045 },
-    ]
-
-    function lerpLatLon(a, b, t) {
-      // Slerp-ish: interpolate lat/lon + lift arc above surface
-      const lat = a.lat + (b.lat - a.lat) * t
-      const lon = a.lon + (b.lon - a.lon) * t
-      // lift factor: arc peaks at t=0.5
-      const lift = 1 + 0.22 * Math.sin(t * Math.PI)
-      return { lat, lon, lift }
+    function drawGrid() {
+      ;[-0.58,-0.29,0,0.29,0.58].forEach(lat => {
+        ctx.beginPath(); let go=false
+        ctx.setLineDash(lat===0?[]:[4,7])
+        for(let i=0;i<=180;i++){
+          const p=proj(lat,(i/180)*Math.PI*2)
+          if(p.z<0){go=false;continue}
+          go?ctx.lineTo(p.x,p.y):(ctx.moveTo(p.x,p.y),go=true)
+        }
+        ctx.strokeStyle=lat===0?'rgba(6,200,200,.32)':'rgba(6,200,200,.13)'
+        ctx.lineWidth=lat===0?1.1:.65; ctx.stroke(); ctx.setLineDash([])
+      })
+      for(let m=0;m<6;m++){
+        const lon=(m/6)*Math.PI*2
+        ctx.beginPath(); let go=false; ctx.setLineDash([3,8])
+        for(let i=0;i<=120;i++){
+          const p=proj(-Math.PI/2+(i/120)*Math.PI,lon)
+          if(p.z<0){go=false;continue}
+          go?ctx.lineTo(p.x,p.y):(ctx.moveTo(p.x,p.y),go=true)
+        }
+        ctx.strokeStyle='rgba(6,200,200,.1)'; ctx.lineWidth=.6
+        ctx.stroke(); ctx.setLineDash([])
+      }
     }
 
-    function drawThreatArc(arc) {
-      const steps = 60
-      const a = { lat: arc.lat1, lon: arc.lon1 }
-      const b = { lat: arc.lat2, lon: arc.lon2 }
+    function drawArcs() {
+      arcPairs.forEach(arc=>{
+        const pa=proj(arc.a.lat,arc.a.lon), pb=proj(arc.b.lat,arc.b.lon)
+        if(pa.z<0||pb.z<0){arc.t=(arc.t+arc.spd)%1;return}
+        const mx=(pa.x+pb.x)/2, my=(pa.y+pb.y)/2
+        const ctrl={x:mx, y:my-32-Math.hypot(pb.x-pa.x,pb.y-pa.y)*.28}
 
-      // faint full path
-      ctx.beginPath()
-      let started = false
-      for (let i = 0; i <= steps; i++) {
-        const { lat, lon, lift } = lerpLatLon(a, b, i / steps)
-        const l = lon + spin
-        const px = cx + R * lift * Math.cos(lat) * Math.sin(l)
-        const py = cy - R * lift * Math.sin(lat)
-        const z  = Math.cos(lat) * Math.cos(l)
-        if (z < 0) { started = false; continue }
-        started ? ctx.lineTo(px, py) : (ctx.moveTo(px, py), started = true)
-      }
-      ctx.strokeStyle = arc.color + '40'
-      ctx.lineWidth = 1.5
-      ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(pa.x,pa.y)
+        ctx.quadraticCurveTo(ctrl.x,ctrl.y,pb.x,pb.y)
+        ctx.strokeStyle=arc.color+'30'; ctx.lineWidth=1.2; ctx.stroke()
 
-      // bright travelled portion
-      ctx.beginPath()
-      started = false
-      for (let i = 0; i <= steps; i++) {
-        const frac = i / steps
-        if (frac > arc.t) break
-        const { lat, lon, lift } = lerpLatLon(a, b, frac)
-        const l = lon + spin
-        const px = cx + R * lift * Math.cos(lat) * Math.sin(l)
-        const py = cy - R * lift * Math.sin(lat)
-        const z  = Math.cos(lat) * Math.cos(l)
-        if (z < 0) { started = false; continue }
-        started ? ctx.lineTo(px, py) : (ctx.moveTo(px, py), started = true)
-      }
-      ctx.strokeStyle = arc.color
-      ctx.lineWidth = 2
-      ctx.shadowColor = arc.color
-      ctx.shadowBlur = 6
-      ctx.stroke()
-      ctx.shadowBlur = 0
+        ctx.beginPath(); let go=false
+        for(let i=0;i<=50;i++){
+          const t=(arc.t*i)/50
+          const pt=qbez(pa,ctrl,pb,t)
+          go?ctx.lineTo(pt.x,pt.y):(ctx.moveTo(pt.x,pt.y),go=true)
+        }
+        ctx.strokeStyle=arc.color; ctx.lineWidth=2
+        ctx.shadowColor=arc.color; ctx.shadowBlur=10; ctx.stroke(); ctx.shadowBlur=0
 
-      // endpoint origin dot
-      const p1 = project(arc.lat1, arc.lon1)
-      if (p1.z > 0) {
-        const pulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.003)
-        ctx.beginPath(); ctx.arc(p1.x, p1.y, 4, 0, Math.PI*2)
-        ctx.fillStyle = arc.color
-        ctx.shadowColor = arc.color; ctx.shadowBlur = 10 * pulse
-        ctx.fill(); ctx.shadowBlur = 0
-      }
+        const td=qbez(pa,ctrl,pb,arc.t)
+        ctx.beginPath(); ctx.arc(td.x,td.y,4,0,Math.PI*2)
+        ctx.fillStyle='#fff'; ctx.shadowColor=arc.color; ctx.shadowBlur=18
+        ctx.fill(); ctx.shadowBlur=0
 
-      // traveling dot
-      const { lat: tl, lon: tlon, lift: tlift } = lerpLatLon(a, b, arc.t)
-      const tl2 = tlon + spin
-      const tx = cx + R * tlift * Math.cos(tl) * Math.sin(tl2)
-      const ty = cy - R * tlift * Math.sin(tl)
-      const tz = Math.cos(tl) * Math.cos(tl2)
-      if (tz > 0) {
-        ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI*2)
-        ctx.fillStyle = '#fff'
-        ctx.shadowColor = arc.color; ctx.shadowBlur = 18
-        ctx.fill(); ctx.shadowBlur = 0
-      }
+        arc.t=(arc.t+arc.spd)%1
+      })
+    }
 
-      arc.t = (arc.t + arc.spd) % 1
+    function drawNodes() {
+      [...nodes].sort((a,b)=>proj(a.lat,a.lon).z-proj(b.lat,b.lon).z).forEach(n=>{
+        n.phase+=n.spd
+        const p=proj(n.lat,n.lon)
+        if(p.z<0) return
+        const pulse=0.45+0.55*Math.sin(n.phase)
+        const bright=0.5+0.5*p.z
+
+        // Wide glow halo
+        const gr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,n.r*8)
+        gr.addColorStop(0,  n.color+'dd')
+        gr.addColorStop(0.2,n.color+'88')
+        gr.addColorStop(0.6,n.color+'22')
+        gr.addColorStop(1,  'transparent')
+        ctx.globalAlpha=pulse*bright
+        ctx.beginPath(); ctx.arc(p.x,p.y,n.r*8,0,Math.PI*2)
+        ctx.fillStyle=gr; ctx.fill()
+        ctx.globalAlpha=1
+
+        // Outer ring
+        ctx.beginPath(); ctx.arc(p.x,p.y,n.r*2.4,0,Math.PI*2)
+        ctx.strokeStyle=n.color+Math.round(100*pulse*bright).toString(16).padStart(2,'0')
+        ctx.lineWidth=.9; ctx.stroke()
+
+        // Core dot
+        ctx.beginPath(); ctx.arc(p.x,p.y,n.r,0,Math.PI*2)
+        ctx.fillStyle=n.color
+        ctx.shadowColor=n.color; ctx.shadowBlur=20+16*pulse*bright
+        ctx.fill(); ctx.shadowBlur=0
+
+        // White hot centre
+        ctx.beginPath(); ctx.arc(p.x,p.y,n.r*.38,0,Math.PI*2)
+        ctx.fillStyle='rgba(255,255,255,.95)'; ctx.fill()
+      })
     }
 
     function frame() {
-      ctx.clearRect(0, 0, SIZE, SIZE)
-      spin += 0.004
-
-      // outer sphere circle
-      ctx.beginPath()
-      ctx.arc(cx, cy, R, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(6,200,200,.3)'
-      ctx.lineWidth = 1.4
-      ctx.setLineDash([])
-      ctx.stroke()
-
-      // latitude lines
-      ;[-0.52, -0.26, 0, 0.26, 0.52].forEach((lat, i) => drawLatitude(lat, i !== 2))
-
-      // meridians (4 evenly spaced)
-      ;[0, Math.PI/4, Math.PI/2, 3*Math.PI/4].forEach(lon => drawMeridian(lon))
-
-      // threat arcs
-      threatArcs.forEach(drawThreatArc)
-
-      // center glow dot
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003)
-      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2)
-      ctx.fillStyle = '#0070fd'
-      ctx.shadowColor = '#0070fd'; ctx.shadowBlur = 20 + 12 * pulse
-      ctx.fill(); ctx.shadowBlur = 0
-
-      raf = requestAnimationFrame(frame)
+      ctx.clearRect(0,0,S,S)
+      spin+=0.0022
+      drawSphere(); drawGrid(); drawArcs(); drawNodes()
+      raf=requestAnimationFrame(frame)
     }
     frame()
-    return () => cancelAnimationFrame(raf)
-  }, [])
+    return ()=>cancelAnimationFrame(raf)
+  },[])
 
-  return (
-    <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
-  )
+  return <canvas ref={canvasRef} style={{display:'block',margin:'0 auto'}} />
 }
 
 /* ─── FEATURE 2 — SECURITY ────────────────────────────────── */
+
 function ThreatFeed() {
   const samples = [
     ['#ff5c7a', 'C2 beacon', 'RU'], ['#ffb547', 'Phishing URL', 'CN'],
@@ -647,37 +640,58 @@ function ThreatFeed() {
   }, [])
 
   return (
-    <div className="viz" style={{ aspectRatio: '4 / 3.6' }}>
-      <div className="viz-grid"></div>
-      <div className="viz-head">
-        <span className="vd" style={{ background: '#ff5f57' }}></span>
-        <span className="vd" style={{ background: '#febc2e' }}></span>
-        <span className="vd" style={{ background: '#28c840' }}></span>
+    <div style={{
+      position: 'relative', borderRadius: 20, overflow: 'hidden',
+      background: 'linear-gradient(160deg,#060e1e,#080f1c)',
+      border: '1px solid rgba(6,200,200,.12)',
+      boxShadow: '0 40px 80px -40px rgba(0,0,30,.8)',
+      minHeight: 420,
+    }}>
+      {/* grid bg */}
+      <div style={{
+        position:'absolute',inset:0,
+        backgroundImage:'linear-gradient(rgba(6,200,200,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(6,200,200,.04) 1px,transparent 1px)',
+        backgroundSize:'36px 36px',
+      }}/>
+
+      {/* title bar */}
+      <div style={{
+        position:'relative',zIndex:3,display:'flex',alignItems:'center',gap:7,
+        padding:'13px 18px',fontFamily:"'JetBrains Mono',monospace",fontSize:11,
+        color:'var(--on-dark-2)',borderBottom:'1px solid rgba(255,255,255,.05)',
+      }}>
+        <span style={{width:8,height:8,borderRadius:'50%',background:'#ff5f57',display:'inline-block'}}/>
+        <span style={{width:8,height:8,borderRadius:'50%',background:'#febc2e',display:'inline-block'}}/>
+        <span style={{width:8,height:8,borderRadius:'50%',background:'#28c840',display:'inline-block'}}/>
         &nbsp;&nbsp;threat_intel.geo
+        <span style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:5,color:'var(--cyan)',fontSize:10}}>
+          <span style={{width:5,height:5,borderRadius:'50%',background:'var(--cyan)',animation:'blink 1.4s infinite',display:'inline-block'}}/>
+          LIVE
+        </span>
       </div>
-      {/* globe fills the left ~60% */}
-      <div style={{ position: 'absolute', inset: 0, top: 40, display: 'flex', alignItems: 'center' }}>
-        <div style={{ flex: '0 0 62%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <AnimatedGlobe />
-        </div>
-        {/* threat feed right side */}
-        <div style={{ flex: 1, paddingRight: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+      {/* globe centred + feed overlaid bottom-right */}
+      <div style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',justifyContent:'center',padding:'10px 0 16px'}}>
+        <AnimatedGlobe />
+
+        {/* threat cards — absolute over globe right side */}
+        <div style={{
+          position:'absolute',right:18,top:'50%',transform:'translateY(-50%)',
+          display:'flex',flexDirection:'column',gap:9,width:190,
+        }}>
           {items.map((it) => (
             <div key={it.key} style={{
-              background: 'rgba(11,18,36,.86)', border: '1px solid var(--line-d)',
-              borderRadius: 12, padding: '10px 12px',
-              fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
-              color: 'var(--on-dark)',
-              transition: 'opacity .4s, transform .4s',
+              background:'rgba(5,12,28,.88)',backdropFilter:'blur(8px)',
+              border:'1px solid rgba(255,255,255,.09)',
+              borderLeft:`2px solid ${it.color}`,
+              borderRadius:10,padding:'9px 12px',
+              fontFamily:"'JetBrains Mono',monospace",
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: it.color, boxShadow: `0 0 8px ${it.color}`,
-                }} />
-                <span style={{ fontWeight: 600, color: '#fff', fontSize: 11.5 }}>{it.label}</span>
+              <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:3}}>
+                <span style={{width:7,height:7,borderRadius:'50%',flexShrink:0,background:it.color,boxShadow:`0 0 8px ${it.color}`}}/>
+                <span style={{fontWeight:700,color:'#fff',fontSize:11}}>{it.label}</span>
               </div>
-              <div style={{ color: 'var(--on-dark-3)', fontSize: 10.5, paddingLeft: 16 }}>{it.country}</div>
+              <div style={{color:'var(--on-dark-3)',fontSize:10,paddingLeft:14}}>{it.country}</div>
             </div>
           ))}
         </div>
