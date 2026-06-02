@@ -671,15 +671,55 @@ function PlatformCard() {
               </div>
             </div>
             <div className="pc-visual">
+              <style>{`
+                @keyframes orbit-spin {
+                  from { transform: translate(-50%, -50%) rotate(0deg); }
+                  to   { transform: translate(-50%, -50%) rotate(360deg); }
+                }
+                @keyframes node-counter {
+                  from { transform: rotate(0deg); }
+                  to   { transform: rotate(-360deg); }
+                }
+                .orbit-ring {
+                  position: absolute;
+                  left: 50%; top: 50%;
+                  transform: translate(-50%, -50%);
+                  animation: orbit-spin 18s linear infinite;
+                  width: 100%; height: 100%;
+                }
+                .orbit-node-wrap {
+                  position: absolute;
+                  left: 50%; top: 50%;
+                  width: 50px; height: 50px;
+                  margin: -25px;
+                }
+                .orbit-node-icon {
+                  width: 100%; height: 100%;
+                  border-radius: 14px;
+                  background: rgba(15,26,48,.95);
+                  border: 1px solid var(--line-d);
+                  display: grid; place-items: center;
+                  box-shadow: 0 12px 30px -12px rgba(0,0,0,.6);
+                  animation: node-counter 18s linear infinite;
+                }
+                .orbit-node-icon svg { width: 22px; height: 22px; stroke: var(--cyan); }
+                .orbit-ring:hover { animation-play-state: paused; }
+                .orbit-ring:hover .orbit-node-icon { animation-play-state: paused; }
+              `}</style>
               <div className="pc-orbit">
                 <div className="pc-ringline" style={{ width: '78%', height: '78%' }}></div>
                 <div className="pc-ringline" style={{ width: '50%', height: '50%' }}></div>
                 <div className="pc-core">
                   <svg viewBox="0 0 48 48" fill="none"><rect x="10" y="10" width="28" height="28" rx="7" stroke="#fff" strokeWidth="2"/><path d="M18 24h12M24 18v12" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
                 </div>
-                {nodeTransforms.map((t, i) => (
-                  <div key={i} className="pc-node" style={{ transform: t }}>{nodeIcons[i]}</div>
-                ))}
+                {/* rotating ring — all nodes orbit together */}
+                <div className="orbit-ring">
+                  {nodeTransforms.map((t, i) => (
+                    <div key={i} className="orbit-node-wrap" style={{ transform: t.replace('translate(-50%,-50%) ', '') }}>
+                      <div className="orbit-node-icon">{nodeIcons[i]}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
