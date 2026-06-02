@@ -151,8 +151,8 @@ function Hero() {
       <div className="wrap hero-inner">
         <div className="hero-copy">
           <span className="eyebrow on-dark reveal"><span className="dot"></span> Sovereign Network Intelligence</span>
-          <h1 className="reveal d1">Built to secure and optimize <span className="grad-text">national-scale networks</span></h1>
-          <p className="hero-sub reveal d2">SechPoint helps telecoms, ISPs, and national cyber teams gain real-time visibility, control encrypted traffic, strengthen cyber defense, and improve subscriber experience through DPI-powered intelligence.</p>
+          <h1 className="reveal d1">Secure national networks <span className="grad-text">at scale</span></h1>
+          <p className="hero-sub reveal d2">SechPoint helps telecoms, ISPs, and cyber teams inspect traffic, detect threats, and improve network performance with DPI-powered intelligence.</p>
           <ul className="hero-proof reveal d3" style={{ listStyle: 'none', padding: 0 }}>
             {['High-speed AI/ML-powered DPI', 'Cybersecurity and IP/URL intelligence', 'Subscriber analytics and traffic orchestration'].map(t => (
               <li key={t} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
