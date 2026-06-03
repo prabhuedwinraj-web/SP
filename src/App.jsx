@@ -3,22 +3,184 @@ import Logo from './Logo.jsx'
 import { meshCanvas } from './mesh.js'
 import analystImg from './assets/hero-analyst.jpg'
 
+/* ─── NAV DROPDOWN DATA ───────────────────────────────────── */
+const PLATFORM_ITEMS = [
+  { icon: <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h6l2-4 2 8 2-4h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>, label: 'DPI ENGINE', desc: 'Deep packet inspection at line rate' },
+  { icon: <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="4" rx="1.5" stroke="currentColor" strokeWidth="1.8"/><rect x="4" y="14" width="16" height="4" rx="1.5" stroke="currentColor" strokeWidth="1.8"/></svg>, label: 'AIG APPLIANCES', desc: 'Purpose-built hardware for telecom scale' },
+  { icon: <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>, label: 'COMMAND CENTER', desc: 'Centralized visibility and control' },
+  { icon: <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>, label: 'SUBSCRIBER ANALYTICS', desc: 'Per-user traffic and behaviour insights' },
+]
+const SOLUTIONS_ITEMS = [
+  { icon: <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>, label: 'CYBER DEFENSE', desc: 'Inline threat detection and IP intelligence' },
+  { icon: <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.8"/><path d="M20 20l-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>, label: 'NETWORK VISIBILITY', desc: 'Real-time Layer 7 traffic classification' },
+  { icon: <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8"/><path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>, label: 'SOC & CERT', desc: 'Threat feeds for security operations teams' },
+  { icon: <svg viewBox="0 0 24 24" fill="none"><path d="M4 8h16M4 16h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="8" r="2" fill="white" stroke="currentColor" strokeWidth="1.8"/><circle cx="15" cy="16" r="2" fill="white" stroke="currentColor" strokeWidth="1.8"/></svg>, label: 'COMPLIANCE', desc: 'Traffic controls for regulatory alignment' },
+]
+
+function NavDropdown({ items, featured }) {
+  return (
+    <div style={{
+      position: 'absolute', top: 'calc(100% + 10px)', left: '50%', transform: 'translateX(-50%)',
+      background: '#fff', borderRadius: 16,
+      boxShadow: '0 8px 40px -8px rgba(12,23,48,.18), 0 0 0 1px rgba(0,0,0,.07)',
+      display: 'flex', minWidth: 640, overflow: 'hidden',
+      animation: 'dropIn .18s cubic-bezier(.22,.61,.36,1)',
+    }}>
+      {/* Left — items */}
+      <div style={{ flex: '0 0 52%', padding: '16px 8px' }}>
+        {items.map(it => (
+          <a key={it.label} href="#" style={{
+            display: 'flex', alignItems: 'flex-start', gap: 14,
+            padding: '12px 16px', borderRadius: 10, textDecoration: 'none',
+            transition: 'background .15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background='#f4f7fc'}
+          onMouseLeave={e => e.currentTarget.style.background='transparent'}
+          >
+            <span style={{
+              width: 36, height: 36, borderRadius: 9, background: '#f4f7fc',
+              display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1,
+            }}>
+              <span style={{ width: 18, height: 18, color: '#44506a' }}>{it.icon}</span>
+            </span>
+            <span>
+              <span style={{
+                display: 'block', fontSize: 11, fontWeight: 700,
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                letterSpacing: '.08em', color: '#0c1730', marginBottom: 3,
+              }}>{it.label}</span>
+              <span style={{
+                display: 'block', fontSize: 13, color: '#6b7790',
+                fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 400, lineHeight: 1.45,
+              }}>{it.desc}</span>
+            </span>
+            <svg viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10, marginLeft: 'auto', marginTop: 6, opacity: .35, flexShrink: 0 }}>
+              <path d="M2 10L10 2M10 2H4M10 2v6" stroke="#0c1730" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </a>
+        ))}
+      </div>
+      {/* Divider */}
+      <div style={{ width: 1, background: '#eef2fa', margin: '16px 0' }} />
+      {/* Right — featured */}
+      <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          borderRadius: 10, overflow: 'hidden', marginBottom: 14,
+          background: 'linear-gradient(135deg,#060e22,#0a1840)',
+          height: 140, display: 'grid', placeItems: 'center',
+          position: 'relative',
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: 'linear-gradient(rgba(6,200,200,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(6,200,200,.08) 1px,transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}/>
+          <div style={{ position: 'relative', textAlign: 'center' }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 14, margin: '0 auto 8px',
+              background: 'linear-gradient(135deg,#0055ff,#06c8c8)',
+              display: 'grid', placeItems: 'center',
+              boxShadow: '0 0 24px rgba(6,200,200,.5)',
+            }}>
+              {featured.icon}
+            </div>
+            <div style={{ fontFamily: "'Funnel Display',sans-serif", fontWeight: 700, fontSize: 13, color: '#fff' }}>
+              {featured.title}
+            </div>
+          </div>
+        </div>
+        <div style={{
+          fontFamily: "'Funnel Display',sans-serif", fontWeight: 700,
+          fontSize: 15, color: '#0c1730', marginBottom: 6, lineHeight: 1.3,
+        }}>{featured.heading}</div>
+        <div style={{
+          fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 13,
+          color: '#6b7790', lineHeight: 1.55, flex: 1,
+        }}>{featured.body}</div>
+        <a href="#" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 14,
+          fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 13,
+          fontWeight: 600, color: '#0055ff', textDecoration: 'none',
+        }}>
+          Learn more
+          <svg viewBox="0 0 16 16" fill="none" style={{ width: 13, height: 13 }}>
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+      </div>
+      <style>{`@keyframes dropIn { from { opacity:0; transform:translateX(-50%) translateY(-6px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
+    </div>
+  )
+}
+
 /* ─── NAV ─────────────────────────────────────────────────── */
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [open, setOpen] = useState(null) // 'platform' | 'solutions' | null
+  const navRef = useRef(null)
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => { if (navRef.current && !navRef.current.contains(e.target)) setOpen(null) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const platformFeatured = {
+    icon: <svg viewBox="0 0 24 24" fill="none" style={{width:26,height:26}}><rect x="10" y="10" width="14" height="14" rx="4" stroke="#fff" strokeWidth="1.8"/><path d="M14 14h6M17 11v6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+    title: 'SechPoint Platform',
+    heading: 'One platform for DPI, security and subscriber intelligence',
+    body: 'AIG appliances, Command Center and Aleria analytics — working together at national scale.',
+  }
+  const solutionsFeatured = {
+    icon: <svg viewBox="0 0 24 24" fill="none" style={{width:26,height:26}}><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    title: 'Cyber & Visibility',
+    heading: 'Built for telecoms, ISPs and national cyber teams',
+    body: 'From threat detection to subscriber policy — purpose-built for high-throughput regulated networks.',
+  }
+
   return (
-    <header className={`nav${scrolled ? ' scrolled' : ''}`}>
+    <header className={`nav${scrolled ? ' scrolled' : ''}`} ref={navRef}>
       <div className="wrap nav-inner">
         <a className="logo" href="#" aria-label="SechPoint home"><Logo /></a>
         <nav className="nav-links">
-          <a href="#platform">Platform <svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
-          <a href="#security">Solutions <svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
+          {/* Platform dropdown */}
+          <div style={{ position: 'relative' }}
+            onMouseEnter={() => setOpen('platform')}
+            onMouseLeave={() => setOpen(null)}
+          >
+            <a href="#platform" style={{ display:'inline-flex', alignItems:'center', gap:5 }}
+              onClick={e => { e.preventDefault(); setOpen(open === 'platform' ? null : 'platform') }}>
+              Platform
+              <svg viewBox="0 0 12 12" fill="none" style={{ width:11, height:11, transition:'transform .2s', transform: open==='platform'?'rotate(180deg)':'none' }}>
+                <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
+            {open === 'platform' && <NavDropdown items={PLATFORM_ITEMS} featured={platformFeatured} />}
+          </div>
+
+          {/* Solutions dropdown */}
+          <div style={{ position: 'relative' }}
+            onMouseEnter={() => setOpen('solutions')}
+            onMouseLeave={() => setOpen(null)}
+          >
+            <a href="#security" style={{ display:'inline-flex', alignItems:'center', gap:5 }}
+              onClick={e => { e.preventDefault(); setOpen(open === 'solutions' ? null : 'solutions') }}>
+              Solutions
+              <svg viewBox="0 0 12 12" fill="none" style={{ width:11, height:11, transition:'transform .2s', transform: open==='solutions'?'rotate(180deg)':'none' }}>
+                <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
+            {open === 'solutions' && <NavDropdown items={SOLUTIONS_ITEMS} featured={solutionsFeatured} />}
+          </div>
+
           <a href="#security">Security</a>
           <a href="#platform">Resources</a>
           <a href="#">Company</a>
