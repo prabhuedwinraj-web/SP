@@ -48,7 +48,7 @@
   --ease: cubic-bezier(.22,.61,.36,1);
 
   /* Type */
-  --font-display: 'Host Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
