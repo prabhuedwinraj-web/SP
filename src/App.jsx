@@ -796,14 +796,14 @@ function ProofBand() {
       <div className="wrap reveal" style={{ position: 'relative', zIndex: 2, padding: '110px 32px' }}>
         <div style={{ maxWidth: 680 }}>
           {/* eyebrow */}
-          <span className="eyebrow on-dark" style={{ marginBottom: 32, display: 'inline-flex' }}>
+          <span className="eyebrow on-dark" style={{ marginBottom: 24, display: 'inline-flex' }}>
             <span className="dot"></span> Customer story
           </span>
 
           {/* opening mark */}
           <div style={{
-            fontFamily: 'Georgia, serif', fontSize: 96, lineHeight: 0,
-            color: 'var(--cyan)', opacity: .5, height: 36, marginBottom: 28,
+            fontFamily: 'Georgia, serif', fontSize: 80, lineHeight: 1,
+            color: 'var(--cyan)', opacity: .5, marginBottom: 20,
           }}>&ldquo;</div>
 
           {/* quote */}
